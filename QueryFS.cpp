@@ -276,14 +276,14 @@ public:
                   << ") ---\n";
 
         // Normalize: strip trailing '/' so "dir/" and "dir" behave the same.
-        std::string prefix = dirPath;
+        std::string prefix = fs::path(dirPath).generic_string();
         while (prefix.size() > 1 && prefix.back() == '/') prefix.pop_back();
         if (prefix == ".") prefix = "";
 
         int hits = 0;
 
         src->traverse([&](const FileNode* node) {
-            const std::string& fp = node->getFullPath();
+            std::string fp = fs::path(node->getFullPath()).generic_string();
 
             if (fp.compare(0, prefix.size(), prefix) != 0) return; // wrong prefix
             std::string rest = fp.substr(prefix.size());  // e.g. "/src/main.cpp"
@@ -409,7 +409,7 @@ int menu() {
               << " 3. Search by Directory\n"
               << " 4. Exit\n"
               << "=========================================\n";
-    return readInt("Choice: ", 4);   // EOF/junk -> exit cleanly
+    return readInt("Choice: ", 5);   // EOF/junk -> exit cleanly
 }
 
 std::unique_ptr<SearchStrategy> runNameSearch() {
@@ -456,7 +456,17 @@ int main() {
             case 1: { auto s = runNameSearch();      s->search(&index); break; }
             case 2: { auto s = runTypeSearch();      s->search(&index); break; }
             case 3: { auto s = runDirectorySearch(); s->search(&index); break; }
-            case 4: running = false; break;
+            case 4: {
+                int shown = 0;
+                index.traverse([&](const FileNode* node) {
+                    std::cout << "  " << node->getFullPath() << "  ("
+                              << node->getSize() << " bytes)\n";
+                    ++shown;
+                });
+                std::cout << "  " << shown << " file(s) total.\n";
+                break;
+            }
+            case 5: running = false; break;
             default: std::cout << "Invalid choice.\n";
         }
     }
