@@ -1,248 +1,186 @@
-<div align="center">
+# QueryFS - File Search Engine
 
-# 🔎 QueryFS
+A C++ console program that scans all drives of a Windows computer, remembers every file and folder in a linked list, and lets the user search them instantly by name, by extension or by folder.
 
-### A blazing-fast, terminal-based file search engine written in modern C++
-
-![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?style=for-the-badge&logo=cplusplus&logoColor=white)
-![Platform](https://img.shields.io/badge/Windows%20%7C%20Linux%20%7C%20macOS-444?style=for-the-badge&logo=windowsterminal&logoColor=white)
-![Dependencies](https://img.shields.io/badge/Dependencies-None-2ea44f?style=for-the-badge)
-![Files](https://img.shields.io/badge/Source-Single%20File-orange?style=for-the-badge)
-
-*Scan every drive once. Search millions of files in milliseconds.*
-
-[Features](#-features) • [Quick Start](#-quick-start) • [How It Works](#-how-it-works) • [OOP Concepts](#-oop-concepts) • [Error Handling](#-error-handling)
-
-</div>
+- Course: Object Oriented Programming (ITY23PCL203), CA-4 project
+- Author: Vinayak, Roll No. 2506033
+- Institute: IICT, MGM University
 
 ---
 
-## ✨ Features
+## Features
 
-| | Feature | Details |
-|---|---|---|
-| 💽 | **Auto-scans all drives** | Finds `C:\`, `D:\`, `E:\`… on Windows and `/` on Linux/macOS, with no setup |
-| ⚡ | **Instant search** | The whole index lives in memory, so searches take milliseconds |
-| 💾 | **Saved index** | After the first scan, the index is loaded from a cache file on every start |
-| 🔤 | **Normal search** | Matches any file *or* folder whose name contains your text (case-insensitive) |
-| 📄 | **Extension search** | Finds every `.pdf`, `.png`, `.cpp`… (the leading dot is optional) |
-| 📁 | **Folder search** | Finds folders only |
-| 🖥️ | **Clean terminal UI** | Screen clearing, paged results, live scan progress, tidy columns |
-| 🛡️ | **Fault tolerant** | Locked folders, symlink loops and corrupt cache lines never crash it |
-| 📦 | **Zero dependencies** | One `.cpp` file and the C++ standard library |
+- Scans all drives (C:, D:, E:, ...) automatically
+- Saves the result in a text file (cache), so the next start is instant
+- Three searches: normal (name), by extension, by folder
+- Search results are sorted A-Z using bubble sort
+- Results are shown page by page (15 per page)
+- Keeps a history of the last 10 searches
+- Skips locked or unreadable folders instead of crashing
 
 ---
 
-## 🚀 Quick Start
+## How it works
 
-**Requirements:** any C++17 compiler (`g++`, `clang++`, MSVC).
+### On start
 
-```bash
-# 1. Clone
-git clone https://github.com/Vinayak-07/QueryFS.git
-cd QueryFS
+1. The program tries to open `queryfs_index.txt` with `ifstream`.
+2. If the file exists, every line is read and added to the linked list. No scanning is needed, so the program is ready immediately.
+3. If the file does not exist (or is empty), the Scanner scans all drives and `ofstream` creates the file.
 
-# 2. Build
-g++ -std=c++17 -O2 QueryFS.cpp -o queryfs
+### Rescan
 
-# 3. Run
-./queryfs            # Windows: .\queryfs.exe
+Menu option 5 scans all drives again and rewrites the cache file. Use it after files have been added, deleted or renamed, because the cache only changes when a rescan is done.
+
+### Searching
+
+1. The user chooses a search type and types the text.
+2. A `SearchStrategy` object for that type is created.
+3. The linked list is walked once to count the matches, and a second time to put them in an array of exactly that size.
+4. The array is sorted with bubble sort (by file name, A-Z).
+5. The results are shown 15 at a time.
+
+---
+
+## Classes
+
+| Class | Job |
+|-------|-----|
+| `FileNode` | One file or folder: path, lowercase name, extension, size, folder flag, next pointer |
+| `FileList` | Singly linked list that owns all the nodes. Its destructor deletes every node |
+| `Scanner` | Walks through all drives with `std::filesystem` and adds every entry to the list |
+| `Writer` | `save()` writes the list to the cache file (`ofstream`), `load()` reads it back (`ifstream`) |
+| `SearchStrategy` | Abstract base class with two pure virtual functions: `matches()` and `describe()` |
+| `NameSearch` | Matches files and folders whose name contains the text |
+| `ExtensionSearch` | Matches files with exactly the given extension (`pdf` or `.pdf`) |
+| `FolderSearch` | Matches only folders whose name contains the text |
+| `Display` | Everything shown on screen: clear screen, header, menu, results, search history |
+
+---
+
+## OOP concepts used
+
+| Concept | Where |
+|---------|-------|
+| Encapsulation | `FileNode`, `FileList`, `Scanner`, `Writer` and `Display` keep their data private and use getters or public functions |
+| Abstraction | `SearchStrategy` is abstract. It says what a search must do, not how |
+| Inheritance | `NameSearch`, `ExtensionSearch` and `FolderSearch` inherit from `SearchStrategy` |
+| Polymorphism | One `SearchStrategy*` pointer holds any of the three searches, and `strategy->matches()` runs the correct version |
+| Constructors and destructors | `FileNode` works out its name and extension in the constructor. `FileList` frees all nodes in the destructor |
+| Exception handling | `try/catch` in the Scanner (locked folders), in `scanAndSave()` (cache write errors) and in `main()` |
+| File handling | `ifstream` and `ofstream` in the `Writer` class |
+
+---
+
+## Build and run
+
+Needs a C++17 compiler (tested with g++ on MSYS2).
+
+```
+g++ -std=c++17 QueryFS.cpp -o queryfs
+./queryfs
 ```
 
-> ⚠️ Use `-std=c++17` exactly. C++20 changes the return type of `path::u8string()` and breaks the build.
-
-**Optional:** scan a single folder instead of all drives (handy for demos). This mode doesn't touch the cache.
-
-```bash
-./queryfs C:\Users\you\Documents
-```
-
-The **first run** scans everything and saves `queryfs_index.txt`. **Every later run** loads that file and starts instantly. Pick **Rescan** from the menu to refresh it.
+On first run it scans every drive and creates `queryfs_index.txt` in the folder you ran it from. This can take a few minutes on a big disk. Every run after that loads the file and starts at once.
 
 ---
 
-## 🖼️ Demo
+## Menu
 
-**Main menu**
-
-```text
+```
 ==============================================================
    QueryFS - File Search Engine
 ==============================================================
- Loaded 194265 items from saved index. Choose 4 to rescan.
- Indexed: 175553 files, 18712 folders
+ Indexed: 175530 files, 18707 folders
 --------------------------------------------------------------
   1. Normal search   (name of any file or folder)
   2. Search by extension
   3. Search folders
-  4. Rescan drives
-  5. Exit
+  4. Show search history
+  5. Rescan drives   (updates the cache file)
+  6. Exit
 --------------------------------------------------------------
- Choose (1-5):
 ```
 
-**Search results**
+While looking at results:
 
-```text
-==============================================================
-   QueryFS - File Search Engine
-==============================================================
- Search : name contains "report"
- Found  : 20 results in 0.00 ms
---------------------------------------------------------------
- pdf          3 B  /home/user/docs/report5.pdf
- pdf          3 B  /home/user/docs/report4.pdf
- pdf          3 B  /home/user/docs/report1.pdf
- ...
---------------------------------------------------------------
- Page 1 of 2   [Enter] next   [p] previous   [q] menu
- >
+- Enter - next page
+- p - previous page
+- q - back to the menu
+
+Searching is not case sensitive.
+
+---
+
+## Cache file format
+
+`queryfs_index.txt` is a plain text file with one line per file or folder. The three parts of a line are separated by a tab:
+
+```
+F	2048	C:\Users\me\notes.txt
+D	0	C:\Users\me\Documents
 ```
 
-| Key | Action |
-|---|---|
-| `Enter` | Next page (on the last page, back to the menu) |
-| `p` | Previous page |
-| `q` | Back to the menu |
+- First part: `F` for a file, `D` for a folder
+- Second part: size in bytes (0 for folders)
+- Third part: full path
+
+Lines that are damaged are skipped when the file is loaded.
 
 ---
 
-## ⚙️ How It Works
+## Bubble sort
 
-```mermaid
-flowchart LR
-    A([Start]) --> B{Cache file<br/>exists?}
-    B -- Yes --> C[Load index<br/>from file]
-    B -- No --> D[Scan all drives]
-    D --> E[Save cache file]
-    C --> F[(In-memory<br/>linked list)]
-    E --> F
-    F --> G[Menu]
-    G --> H[Pick a search<br/>strategy]
-    H --> I[Walk the list<br/>and match]
-    I --> J[Paged results]
-    J --> G
+After a search, the results array is sorted by file name using bubble sort. Neighbouring items are compared and swapped if they are in the wrong order. After every pass the largest name moves to the end. If a pass makes no swap, the array is already sorted and the loop stops early.
+
+Bubble sort needs about n x n comparisons, so it becomes slow for very large result lists. For that reason results are only sorted when there are 10000 or fewer (`SORT_LIMIT`). Above that they are shown in the order they were found, and the screen says so.
+
+---
+
+## Settings in the code
+
+| Constant | Value | Meaning |
+|----------|-------|---------|
+| `CACHE_FILE` | `queryfs_index.txt` | Name of the cache file |
+| `PAGE_SIZE` | 15 | Results shown per page |
+| `SORT_LIMIT` | 10000 | Most results that will be bubble sorted |
+| `MAX_DEPTH` | 40 | Deepest folder level the scanner enters (stops endless loops) |
+| `HISTORY_SIZE` | 10 | Number of searches remembered |
+
+---
+
+## Test cases
+
+| Test | Expected result |
+|------|-----------------|
+| First run, no cache file | Scans all drives, prints "Saved to queryfs_index.txt" |
+| Second run | Prints "Loaded N items", no scanning |
+| Add a new file, search for it | Not found until Rescan (option 5) is used |
+| Rescan, then search again | File is found |
+| Delete the cache file, run again | Scans again and creates a new file |
+| Empty search text | "Please type something to search." |
+| Menu choice that is not 1 to 6 | "Invalid choice" message |
+| Search with no matches | "Nothing found." |
+| Locked system folders | Skipped, count shown after the scan |
+| Search with more than 10000 results | Shown unsorted with a note on screen |
+
+---
+
+## Limitations
+
+- Drive detection works on Windows only (it checks the letters A: to Z:).
+- The cache can be out of date until a rescan is done.
+- Shortcuts (symlinks) are not entered, and folders deeper than 40 levels are skipped.
+- File names with unusual characters may be skipped on Windows.
+- Search history is kept in memory only and is lost when the program closes.
+- The screen is cleared with an ANSI escape code. If the terminal prints strange characters instead of clearing, change the line in `Display::clearScreen()` to `system("cls");`.
+
+---
+
+## Project files
+
 ```
-
-1. **Scan:** `Scanner` walks each drive recursively and adds every file and folder to a linked list.
-2. **Store:** each `FileNode` keeps a pre-lowercased name, so a search is just a substring check with no extra work.
-3. **Search:** the chosen strategy object decides which nodes match.
-4. **Show:** results appear 15 at a time with size, type and path.
-
-**Performance** (tested on Linux with ≈194,000 files and folders):
-
-| Step | Time |
-|---|---|
-| Full scan (first run only) | ~3 s |
-| Search | ~8 ms |
-
-Times depend on your disk and how many files you have.
-
----
-
-## 🧠 OOP Concepts
-
-QueryFS uses all four pillars of object-oriented programming.
-
-```mermaid
-classDiagram
-    direction LR
-    class SearchStrategy {
-        <<abstract>>
-        +matches(FileNode) bool*
-        +describe() string*
-    }
-    class NameSearch
-    class ExtensionSearch
-    class FolderSearch
-    class FileList {
-        -FileNode* head
-        -FileNode* tail
-        +add()
-        +clear()
-    }
-    class FileNode {
-        -string path
-        -string nameLower
-        -string ext
-        -bool folder
-        +getPath()
-        +getExt()
-        +isFolder()
-    }
-    class Scanner {
-        -FileList& list
-        +scan(root)
-    }
-    class IndexError
-
-    SearchStrategy <|-- NameSearch
-    SearchStrategy <|-- ExtensionSearch
-    SearchStrategy <|-- FolderSearch
-    FileList "1" *-- "many" FileNode
-    Scanner --> FileList : fills
-    IndexError --|> runtime_error
+QueryFS.cpp        the whole program (single file)
+README.md          this file
+queryfs_index.txt  created by the program on first run
 ```
-
-| Pillar | Where it is used |
-|---|---|
-| **Encapsulation** | `FileNode` and `FileList` keep every field `private`; the rest of the program uses getters |
-| **Abstraction** | `SearchStrategy` is an abstract class. It declares *what* a search does (`matches`, `describe`) and leaves *how* to the child classes |
-| **Inheritance** | `NameSearch`, `ExtensionSearch` and `FolderSearch` all inherit from `SearchStrategy` |
-| **Polymorphism** | One `SearchStrategy` pointer holds any of the three searches, and virtual dispatch calls the right `matches()` at runtime |
-
-**Also used:** constructors and destructors, `new`/`delete` ownership (the list frees every node itself), deleted copy operations, `override`, smart pointers (`unique_ptr`) and a custom exception class.
-
----
-
-## 🛡️ Error Handling
-
-| Situation | What QueryFS does |
-|---|---|
-| Folder is locked or access is denied | Skips it, keeps scanning, and reports the skipped count at the end |
-| Symlink or Windows junction loop | Never follows links, so it can't loop forever |
-| Empty CD drive or disconnected drive | Disk pop-ups are suppressed and the drive is skipped |
-| No cache file on first run | Throws `IndexError`, catches it, and scans instead |
-| Cache can't be written (disk full or read-only) | Shows a warning and keeps running |
-| Damaged line in the cache file | Skips that line and loads the rest |
-| Empty search text | Asks the user to type something |
-| Invalid menu choice | Shows a message instead of crashing |
-| Input stream closed (Ctrl+D / Ctrl+Z) | Exits cleanly |
-| Anything unexpected, such as out of memory | Caught in `main` and reported with exit code 1 |
-
----
-
-## 📁 Project Structure
-
-```text
-QueryFS/
-├── QueryFS.cpp        # entire application: classes, scanner, UI
-├── README.md
-├── .gitignore
-└── queryfs_index.txt  # auto-generated cache (not committed)
-```
-
-Inside `QueryFS.cpp`, the code runs in this order: helpers → terminal functions → `IndexError` → `FileNode` → `FileList` → `SearchStrategy` and its children → `Scanner` → cache I/O → search and display → `main`.
-
----
-
-## 📝 Notes
-
-- **Cache location:** `queryfs_index.txt` is created in whatever folder you run the program from. It lists every path on your drives, so keep it out of git. It is already in `.gitignore`.
-- **Case-insensitive search:** works for English letters (A–Z). Non-English file names display correctly but match case-sensitively.
-- **Linux/macOS:** `/proc`, `/sys` and `/dev` are skipped because they're virtual.
-
----
-
-<div align="center">
-
-### 👤 Author
-
-**Vinayak** · B.Tech AI/ML · IICT, MGM University
-Built for **Object-Oriented Programming (ITY23PCL203), CA-4**
-
-[![GitHub](https://img.shields.io/badge/GitHub-Vinayak--07-181717?style=for-the-badge&logo=github)](https://github.com/Vinayak-07)
-
-⭐ *If this helped you, drop a star!* ⭐
-
-</div>
