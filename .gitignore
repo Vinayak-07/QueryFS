@@ -1,3 +1,5 @@
 queryfs
 queryfs.exe
 *.o
+*.exe
+queryfs_index.txt
